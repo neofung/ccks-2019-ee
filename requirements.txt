@@ -30,4 +30,8 @@ jupyterlab-server==1.0.6
 notebook==5.7.8
 openpyxl==3.0.0
 xlsxwriter==1.2.5
-torch==1.0
+torch==1.3.1
+gensim==3.8.1
+pyhanlp==0.1.57
+keras==2.3.1
+tensorflow==1.13.1
