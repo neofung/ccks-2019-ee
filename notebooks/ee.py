@@ -26,7 +26,7 @@ maxlen = 256
 
 
 # 读取数据，排除“其他”类型
-D = pd.read_csv('../data/event_type_entity_extract_train.csv', encoding='utf-8', header=None)
+D = pd.read_csv('../data/cat_train.csv', encoding='utf-8', header=None)
 D = D[D[2] != u'其他']
 D = D[D[1].str.len() <= maxlen]
 
@@ -90,7 +90,7 @@ train_data = [train_data[j] for i, j in enumerate(random_order) if i % 9 != mode
 # In[ ]:
 
 
-D = pd.read_csv('../data/event_type_entity_extract_eval.csv', encoding='utf-8', header=None)
+D = pd.read_csv('../data/cat_eval.csv', encoding='utf-8', header=None)
 test_data = []
 for id,t,c in zip(D[0], D[1], D[2]):
     test_data.append((id, t, c))
@@ -336,7 +336,6 @@ def test(test_data):
     F = open('result.txt', 'w')
     for d in tqdm(iter(test_data)):
         s = u'"%s","%s"\n' % (d[0], extract_entity(d[1].replace('\t', ''), d[2]))
-        s = s.encode('utf-8')
         F.write(s)
     F.close()
 
@@ -353,9 +352,15 @@ train_D = data_generator(train_data)
 
 train_model.fit_generator(train_D.__iter__(),
                           steps_per_epoch=len(train_D),
-                          epochs=120,
+                          epochs=2,
                           callbacks=[evaluator]
                          )
+
+
+# In[ ]:
+
+
+test(test_data)
 
 
 # In[ ]:
