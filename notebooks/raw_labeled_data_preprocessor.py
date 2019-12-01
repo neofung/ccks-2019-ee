@@ -92,7 +92,39 @@ new_label_df['id'] = new_label_df.index
 # In[ ]:
 
 
-new_label_df.to_csv("../data/cat.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
+new_label_df.head()
+
+
+# # read original data
+
+# In[ ]:
+
+
+new_label_train, new_label_eval = train_test_split(new_label_df, test_size=0.3)
+
+
+# In[ ]:
+
+
+original_train_df = pd.read_csv("../data/event_type_entity_extract_train.csv", names=['id', 'sentence', 'query', 'answer'])
+
+
+# In[ ]:
+
+
+updated_train_df = pd.concat([new_label_df, original_train_df], axis=0)
+
+
+# In[ ]:
+
+
+updated_train_df.to_csv("../data/cat_train.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
+
+
+# In[ ]:
+
+
+new_label_eval.to_csv("../data/cat_eval.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
 
 
 # In[ ]:
