@@ -118,7 +118,7 @@ class data_generator:
         return self.steps
     def __iter__(self):
         while True:
-            idxs = range(len(self.data))
+            idxs = list(range(len(self.data)))
             np.random.shuffle(idxs)
             X, C, S1, S2 = [], [], [], []
             for i in idxs:
@@ -317,7 +317,7 @@ class Evaluate(Callback):
         if acc > self.best:
             self.best = acc
             train_model.save_weights('best_model.weights')
-        print 'acc: %.4f, best acc: %.4f\n' % (acc, self.best)
+        print('acc: %.4f, best acc: %.4f\n' % (acc, self.best))
     def evaluate(self):
         A = 1e-10
         for d in tqdm(iter(dev_data)):
@@ -356,4 +356,10 @@ train_model.fit_generator(train_D.__iter__(),
                           epochs=120,
                           callbacks=[evaluator]
                          )
+
+
+# In[ ]:
+
+
+
 
