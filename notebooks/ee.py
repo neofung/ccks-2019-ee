@@ -17,7 +17,7 @@ import pyhanlp
 
 
 mode = 0
-min_count = 2
+min_count = 1
 char_size = 128
 maxlen = 256
 
@@ -352,7 +352,7 @@ train_D = data_generator(train_data)
 
 train_model.fit_generator(train_D.__iter__(),
                           steps_per_epoch=len(train_D),
-                          epochs=2,
+                          epochs=120,
                           callbacks=[evaluator]
                          )
 
@@ -361,10 +361,4 @@ train_model.fit_generator(train_D.__iter__(),
 
 
 test(test_data)
-
-
-# In[ ]:
-
-
-
 

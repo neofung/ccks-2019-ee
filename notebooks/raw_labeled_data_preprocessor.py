@@ -95,6 +95,12 @@ new_label_df['id'] = new_label_df.index
 new_label_df.head()
 
 
+# In[ ]:
+
+
+new_label_df.shape
+
+
 # # read original data
 
 # In[ ]:
