@@ -39,3 +39,4 @@ tensorboard==1.12.2
 tensorflow-estimator==1.13.0
 pytorch-transformers==1.2.0
 jieba==0.39
+keras-bert==0.80.0
