@@ -43,25 +43,45 @@ with codecs.open(dict_path, 'r', 'utf8') as reader:
         token_dict[token] = len(token_dict)
 
 
+# class OurTokenizer(Tokenizer):
+#     def _tokenize(self, text):
+#         R = []
+#         items = re.split("[\{\}]", text)
+#         unused_count = 2
+#         for item in items:
+#             if item.startswith('DATE') or item.startswith('NUM'):
+#                 c = '[unused%d]' % (unused_count)
+#                 unused_count += 1
+#                 R.append(c)
+#             else:
+#                 for c in item:
+#                     if c in self._token_dict:
+#                         R.append(c)
+#                     elif self._is_space(c):
+#                         R.append('[unused1]') # space类用未经训练的[unused1]表示
+#                     else:
+#                         R.append('[UNK]') # 剩余的字符是[UNK]
+#         return R
+
 class OurTokenizer(Tokenizer):
     def _tokenize(self, text):
         R = []
-        items = re.split("[\{\}]", text)
-        for item in items:
-            if item.startswith('DATE') or item.startswith('NUM'):
-                c = '{'+item+'}'
+        for c in text:
+            if c in self._token_dict:
                 R.append(c)
+            elif self._is_space(c):
+                R.append('[unused1]') # space类用未经训练的[unused1]表示
             else:
-                for c in item:
-                    if c in self._token_dict:
-                        R.append(c)
-                    elif self._is_space(c):
-                        R.append('[unused1]') # space类用未经训练的[unused1]表示
-                    else:
-                        R.append('[UNK]') # 剩余的字符是[UNK]
+                R.append('[UNK]') # 剩余的字符是[UNK]
         return R
 
 tokenizer = OurTokenizer(token_dict)
+
+
+# In[ ]:
+
+
+# tokenizer.tokenize("因 {DATE}公司转增股本，泰怡凱拟通过二级市场集中竞价交易、大宗交易减持股份数量相应调整为合计不超过 {NUM_1} 股，即不超过公司目前总股本的 {NUM_2}。")
 
 
 # In[ ]:
@@ -80,16 +100,22 @@ for t,c,n in zip(D[1], D[2], D[3]):
     train_data.append((t, c, n))
 
 
-if not os.path.exists('../random_order_train.json'):
+if not os.path.exists('../temp/random_order_train.json'):
     random_order = list(range(len(train_data)))
     np.random.shuffle(random_order)
     json.dump(
         random_order,
-        open('../random_order_train.json', 'w'),
+        open('../temp/random_order_train.json', 'w'),
         indent=4
     )
 else:
-    random_order = json.load(open('../random_order_train.json'))
+    random_order = json.load(open('../temp/random_order_train.json'))
+
+
+# In[ ]:
+
+
+# train_data
 
 
 # In[ ]:
@@ -101,7 +127,7 @@ additional_chars = set()
 for d in train_data + dev_data:
     additional_chars.update(re.findall(u'[^\u4e00-\u9fa5a-zA-Z0-9\*]', d[2]))
 
-additional_chars.remove(u'，')
+additional_chars.remove('，')
 
 
 # In[ ]:
@@ -184,6 +210,19 @@ from keras.models import Model
 import keras.backend as K
 from keras.callbacks import Callback
 from keras.optimizers import Adam
+
+
+# In[ ]:
+
+
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+config.log_device_placement = True  # to log device placement (on which device the operation ran)
+                                    # (nothing gets printed in Jupyter, only if you run it standalone)
+sess = tf.Session(config=config)
+set_session(sess)  # set this TensorFlow session as the default session for Keras
 
 
 # In[ ]:
@@ -292,14 +331,15 @@ class Evaluate(Callback):
         print('acc: %.4f, best acc: %.4f\n' % (acc, self.best))
     def evaluate(self):
         A = 1e-10
-        F = open('dev_pred.json', 'w')
-        for d in tqdm(iter(dev_data)):
-            R = extract_entity(d[0], d[1])
-            if R == d[2]:
-                A += 1
-            s = ', '.join(d + (R,))
-            F.write(s.encode('utf-8') + '\n')
-        F.close()
+        with open('../temp/dev_pred.json', 'w', encoding='utf-8')as F:
+            for d in tqdm(iter(dev_data)):
+                R = extract_entity(d[0], d[1])
+                if R == d[2]:
+                    A += 1
+                s = ', '.join(d)
+                s += ', '
+                s += R
+                F.write(s + '\n')
         return A / len(dev_data)
 
 
@@ -307,12 +347,12 @@ class Evaluate(Callback):
 
 
 def test(test_data):
-    F = open('../temp/result.txt', 'w')
-    for d in tqdm(iter(test_data)):
-        s = u'"%s","%s"\n' % (d[0], extract_entity(d[1], d[2]))
-        s = s.encode('utf-8')
-        F.write(s)
-    F.close()
+    """注意官方页面写着是以\t分割，实际上却是以逗号分割
+    """
+    with open('../temp/result.txt', 'w', encoding='utf-8') as F:
+        for d in tqdm(iter(test_data)):
+            s = '"%s","%s"\n' % (d[0], extract_entity(d[1].replace('\t', ''), d[2]))
+            F.write(s)
 
 
 # In[ ]:
@@ -327,7 +367,7 @@ train_D = data_generator(train_data)
 
 train_model.fit_generator(train_D.__iter__(),
                               steps_per_epoch=len(train_D),
-                              epochs=10,
+                              epochs=100,
                               callbacks=[evaluator]
                              )
 
@@ -336,4 +376,17 @@ train_model.fit_generator(train_D.__iter__(),
 
 
 train_model.load_weights('best_model.weights')
+
+
+# In[ ]:
+
+
+extract_entity("{DATE}，公司通过集中竞价交易方式首次回购公司股份 {NUM_0}股，已回购股份占公司总股本的 {NUM_1}",
+               "回购__总金额")
+
+
+# In[ ]:
+
+
+test(test_data)
 

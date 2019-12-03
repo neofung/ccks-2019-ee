@@ -58,16 +58,54 @@ new_labeled_data[0]
 # In[ ]:
 
 
+intent_entity_dict = {}
+for item in new_labeled_data:
+    if item['intent'] not in intent_entity_dict:
+        intent_entity_dict[item['intent']] = set()
+    for entity in item['entities']:
+        intent_entity_dict[item['intent']].add(entity['entity'])
+
+
+# In[ ]:
+
+
+list(intent_entity_dict.keys()).remove('选举')
+
+
+# In[ ]:
+
+
+import random
 new_label_df = []
 for t in new_labeled_data:
     intent = t['intent']
     sentence = t['text']
     entity_map = {}
+    contains_entity = set()
     for entity in t['entities']:
         new_label_df.append({
             'sentence': sentence,
             'query': intent+'__'+ entity['entity'],
             'answer': entity['value']
+        })
+        contains_entity.add(entity['entity'])
+    contains_entity = [t for t in intent_entity_dict[intent] if t not in contains_entity]
+    if contains_entity:
+        for t in contains_entity:
+            new_label_df.append({
+                'sentence': sentence,
+                'query': intent+'__'+ t,
+                'answer': 'no_given'
+            })
+    else:
+        temp = list(intent_entity_dict.keys())
+        temp.remove(intent)
+        mock_intent = random.choice(temp)
+        mock_entity = random.choice(list(intent_entity_dict[mock_intent]))
+        new_label_df.append({
+            'sentence': sentence,
+            'query': mock_intent+'__'+ mock_entity,
+            'answer': 'no_given'
         })
 
 
@@ -80,7 +118,7 @@ new_label_df = pd.DataFrame(new_label_df)
 # In[ ]:
 
 
-new_label_df.head()
+# new_label_df.head(20)
 
 
 # In[ ]:
@@ -131,6 +169,12 @@ updated_train_df.to_csv("../data/cat_train.csv", index=False, header=False, colu
 
 
 new_label_eval.to_csv("../data/cat_eval.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
+
+
+# In[ ]:
+
+
+len(updated_train_df)
 
 
 # In[ ]:

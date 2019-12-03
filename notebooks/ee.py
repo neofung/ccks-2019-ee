@@ -10,7 +10,7 @@ import os, re
 import numpy as np
 import pandas as pd
 from gensim.models import Word2Vec
-import pyhanlp
+# import pyhanlp
 
 
 # In[ ]:
@@ -27,19 +27,21 @@ maxlen = 256
 
 # 读取数据，排除“其他”类型
 D = pd.read_csv('../data/cat_train.csv', encoding='utf-8', header=None)
+print(len(D))
 D = D[D[2] != u'其他']
 D = D[D[1].str.len() <= maxlen]
+print(len(D))
 
 
 # In[ ]:
 
 
-if not os.path.exists('../classes.json'):
+if not os.path.exists('../temp/classes.json'):
     id2class = dict(enumerate(D[2].unique()))
     class2id = {j:i for i,j in id2class.items()}
-    json.dump([id2class, class2id], open('../classes.json', 'w'))
+    json.dump([id2class, class2id], open('../temp/classes.json', 'w'))
 else:
-    id2class, class2id = json.load(open('../classes.json'))
+    id2class, class2id = json.load(open('../temp/classes.json'))
 
 
 # In[ ]:
@@ -50,41 +52,76 @@ for t,c,n in zip(D[1], D[2], D[3]):
     start = t.find(n)
     if start != -1:
         train_data.append((t, c, n))
+    else:
+        train_data.append((t, c, ""))
 
 
 # In[ ]:
 
 
-if not os.path.exists('../all_chars_me.json'):
+import re
+if not os.path.exists('../temp/all_chars_me.json'):
     chars = {}
     for d in tqdm(iter(train_data)):
-        for c in d[0]:
-            chars[c] = chars.get(c, 0) + 1
+        items = re.split("[\{\}]", d[0])
+        for item in items:
+            if item.startswith('DATE') or item.startswith('NUM'):
+                c = '{'+item+'}'
+                chars[c] = chars.get(c, 0) +1
+            else:
+                for index, c in enumerate(item):
+                    chars[c] = chars.get(c, 0) + 1
     chars = {i:j for i,j in chars.items() if j >= min_count}
     id2char = {i+2:j for i,j in enumerate(chars)} # 0: mask, 1: padding
     char2id = {j:i for i,j in id2char.items()}
-    json.dump([id2char, char2id], open('../all_chars_me.json', 'w'))
+    json.dump([id2char, char2id], open('../temp/all_chars_me.json', 'w'))
 else:
-    id2char, char2id = json.load(open('../all_chars_me.json'))
+    id2char, char2id = json.load(open('../temp/all_chars_me.json'))
 
 
 # In[ ]:
 
 
-if not os.path.exists('../random_order_train.json'):
+char2id['{NUM_0}']
+
+
+# In[ ]:
+
+
+max(random_order)
+
+
+# In[ ]:
+
+
+for t in train_data:
+    if t[2].startswith("no_"):
+        print(t)
+
+
+# In[ ]:
+
+
+if not os.path.exists('../temp/ee_random_order_train.json'):
     random_order = list(range(len(train_data)))
     np.random.shuffle(random_order)
     json.dump(
         random_order,
-        open('../random_order_train.json', 'w'),
+        open('../temp/ee_random_order_train.json', 'w'),
         indent=4
     )
 else:
-    random_order = json.load(open('../random_order_train.json'))
+    random_order = json.load(open('../temp/ee_random_order_train.json'))
 
 
 dev_data = [train_data[j] for i, j in enumerate(random_order) if i % 9 == mode]
 train_data = [train_data[j] for i, j in enumerate(random_order) if i % 9 != mode]
+
+
+# In[ ]:
+
+
+# random_order
 
 
 # In[ ]:
@@ -152,6 +189,19 @@ from keras.models import Model
 import keras.backend as K
 from keras.callbacks import Callback
 from keras.optimizers import Adam
+
+
+# In[ ]:
+
+
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+config.log_device_placement = True  # to log device placement (on which device the operation ran)
+                                    # (nothing gets printed in Jupyter, only if you run it standalone)
+sess = tf.Session(config=config)
+set_session(sess)  # set this TensorFlow session as the default session for Keras
 
 
 # In[ ]:
@@ -295,6 +345,16 @@ def extract_entity(text_in, c_in):
     """
     if c_in not in class2id:
         return 'NaN'
+    _x = list()
+    items = re.split("[\{\}]", text_in)
+    for item in items:
+        if item.startswith('DATE') or item.startswith('NUM'):
+            c = '{'+item+'}'
+            _x.append(char2id.get(c, 1))
+        else:
+            for c in item:
+                _x.append(char2id.get(c, 1))
+    
     _x = [char2id.get(c, 1) for c in text_in]
     _x = np.array([_x])
     _c = np.array([[class2id[c_in]]])
@@ -333,11 +393,18 @@ class Evaluate(Callback):
 def test(test_data):
     """注意官方页面写着是以\t分割，实际上却是以逗号分割
     """
-    F = open('result.txt', 'w')
-    for d in tqdm(iter(test_data)):
-        s = u'"%s","%s"\n' % (d[0], extract_entity(d[1].replace('\t', ''), d[2]))
-        F.write(s)
-    F.close()
+    with open('../temp/result.txt', 'w', encoding='utf-8') as F:
+        for d in tqdm(iter(test_data)):
+            s = '"%s","%s"\n' % (d[0], extract_entity(d[1].replace('\t', ''), d[2]))
+            F.write(s)
+
+
+# In[ ]:
+
+
+for t in train_data:
+    if not t[2]:
+        print(t)
 
 
 # In[ ]:
@@ -352,7 +419,7 @@ train_D = data_generator(train_data)
 
 train_model.fit_generator(train_D.__iter__(),
                           steps_per_epoch=len(train_D),
-                          epochs=120,
+                          epochs=2000,
                           callbacks=[evaluator]
                          )
 
@@ -360,5 +427,38 @@ train_model.fit_generator(train_D.__iter__(),
 # In[ ]:
 
 
+train_model.save("../models/ccks.20191202.model")
+
+
+# In[ ]:
+
+
+extract_entity("截至 {DATE_0}，公司已通过股票回购专用证券账户以集中竞价交易方式回购股份数量 {NUM_0} 股，占公司总股本的 {NUM_1}，最高成交价为 {NUM_2} 元/股，最低成交价为 {NUM_3} 元/股", 
+               "回购__总金额")
+
+
+# In[ ]:
+
+
 test(test_data)
+
+
+# In[ ]:
+
+
+import tensorflow as tf
+
+with tf.Session() as sess:
+    with tf.device("/gpu:0"):
+        matrix1 = tf.constant([[3., 3.]])
+        matrix2 = tf.constant([[2.], [2.]])
+        product = tf.matmul(matrix1, matrix2)
+    result = sess.run(product)
+    print(result)
+
+
+# In[ ]:
+
+
+
 
