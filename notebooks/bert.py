@@ -19,7 +19,7 @@ import codecs
 
 
 mode = 0
-maxlen = 128
+maxlen = 256
 learning_rate = 5e-5
 min_learning_rate = 1e-5
 
@@ -87,7 +87,7 @@ tokenizer = OurTokenizer(token_dict)
 # In[ ]:
 
 
-D = pd.read_csv('../data/cat_train.csv', encoding='utf-8', header=None)
+D = pd.read_csv('../temp/cat_train.csv', encoding='utf-8', header=None)
 D = D[D[2] != u'其他']
 classes = set(D[2].unique())
 
@@ -133,10 +133,22 @@ additional_chars.remove('，')
 # In[ ]:
 
 
-D = pd.read_csv('../data/cat_eval.csv', encoding='utf-8', header=None)
+D = pd.read_csv('../temp/cat_eval.csv', encoding='utf-8', header=None)
 test_data = []
 for id,t,c in zip(D[0], D[1], D[2]):
     test_data.append((id, t, c))
+
+
+# In[ ]:
+
+
+train_data[0]
+
+
+# In[ ]:
+
+
+tokenizer.tokenize('勤上光电')
 
 
 # In[ ]:
@@ -178,7 +190,7 @@ class data_generator:
             for i in idxs:
                 d = self.data[i]
                 text, c = d[0][:maxlen], d[1]
-                text = u'___%s___%s' % (c, text)
+                text = '___%s___%s' % (c, text)
                 tokens = tokenizer.tokenize(text)
                 e = d[2]
                 e_tokens = tokenizer.tokenize(e)[1:-1]
@@ -186,20 +198,24 @@ class data_generator:
                 start = list_find(tokens, e_tokens)
                 if start != -1:
                     end = start + len(e_tokens) - 1
-                    s1[start] = 1
-                    s2[end] = 1
-                    x1, x2 = tokenizer.encode(first=text)
-                    X1.append(x1)
-                    X2.append(x2)
-                    S1.append(s1)
-                    S2.append(s2)
-                    if len(X1) == self.batch_size or i == idxs[-1]:
-                        X1 = seq_padding(X1)
-                        X2 = seq_padding(X2)
-                        S1 = seq_padding(S1)
-                        S2 = seq_padding(S2)
-                        yield [X1, X2, S1, S2], None
-                        X1, X2, S1, S2 = [], [], [], []
+                else:
+                    start = len(e_tokens) -1
+                    end = len(e_tokens) - 1
+                    
+                s1[start] = 1
+                s2[end] = 1
+                x1, x2 = tokenizer.encode(first=text)
+                X1.append(x1)
+                X2.append(x2)
+                S1.append(s1)
+                S2.append(s2)
+                if len(X1) == self.batch_size or i == idxs[-1]:
+                    X1 = seq_padding(X1)
+                    X2 = seq_padding(X2)
+                    S1 = seq_padding(S1)
+                    S2 = seq_padding(S2)
+                    yield [X1, X2, S1, S2], None
+                    X1, X2, S1, S2 = [], [], [], []
 
 
 # In[ ]:
@@ -282,7 +298,7 @@ def softmax(x):
 def extract_entity(text_in, c_in):
     if c_in not in classes:
         return 'NaN'
-    text_in = u'___%s___%s' % (c_in, text_in)
+    text_in = '___%s___%s' % (c_in, text_in)
     text_in = text_in[:510]
     _tokens = tokenizer.tokenize(text_in)
     _x1, _x2 = tokenizer.encode(first=text_in)
@@ -299,6 +315,9 @@ def extract_entity(text_in, c_in):
             break
     end = _ps2[start:end+1].argmax() + start
     a = text_in[start-1: end]
+#     print(text_in)
+#     print(start-1, end)
+#     print(text_in[:start-1])
     return a
 
 
@@ -327,7 +346,7 @@ class Evaluate(Callback):
         self.ACC.append(acc)
         if acc > self.best:
             self.best = acc
-            train_model.save_weights('best_model.weights')
+            train_model.save_weights('../models/bert_best_model.weights')
         print('acc: %.4f, best acc: %.4f\n' % (acc, self.best))
     def evaluate(self):
         A = 1e-10
@@ -375,18 +394,24 @@ train_model.fit_generator(train_D.__iter__(),
 # In[ ]:
 
 
-train_model.load_weights('best_model.weights')
+# train_model.load_weights('best_model.weights')
 
 
 # In[ ]:
 
 
-extract_entity("{DATE}，公司通过集中竞价交易方式首次回购公司股份 {NUM_0}股，已回购股份占公司总股本的 {NUM_1}",
-               "回购__总金额")
+extract_entity("陈帅先生、张列列先生",
+               "交易违规")
 
 
 # In[ ]:
 
 
 test(test_data)
+
+
+# In[ ]:
+
+
+
 

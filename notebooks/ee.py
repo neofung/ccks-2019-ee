@@ -26,7 +26,7 @@ maxlen = 256
 
 
 # 读取数据，排除“其他”类型
-D = pd.read_csv('../data/cat_train.csv', encoding='utf-8', header=None)
+D = pd.read_csv('../temp/cat_train.csv', encoding='utf-8', header=None)
 print(len(D))
 D = D[D[2] != u'其他']
 D = D[D[1].str.len() <= maxlen]
@@ -88,20 +88,6 @@ char2id['{NUM_0}']
 # In[ ]:
 
 
-max(random_order)
-
-
-# In[ ]:
-
-
-for t in train_data:
-    if t[2].startswith("no_"):
-        print(t)
-
-
-# In[ ]:
-
-
 if not os.path.exists('../temp/ee_random_order_train.json'):
     random_order = list(range(len(train_data)))
     np.random.shuffle(random_order)
@@ -127,7 +113,7 @@ train_data = [train_data[j] for i, j in enumerate(random_order) if i % 9 != mode
 # In[ ]:
 
 
-D = pd.read_csv('../data/cat_eval.csv', encoding='utf-8', header=None)
+D = pd.read_csv('../temp/cat_eval.csv', encoding='utf-8', header=None)
 test_data = []
 for id,t,c in zip(D[0], D[1], D[2]):
     test_data.append((id, t, c))
@@ -376,7 +362,7 @@ class Evaluate(Callback):
         self.ACC.append(acc)
         if acc > self.best:
             self.best = acc
-            train_model.save_weights('best_model.weights')
+            train_model.save_weights('../models/ee_best_model.weights')
         print('acc: %.4f, best acc: %.4f\n' % (acc, self.best))
     def evaluate(self):
         A = 1e-10
@@ -402,14 +388,6 @@ def test(test_data):
 # In[ ]:
 
 
-for t in train_data:
-    if not t[2]:
-        print(t)
-
-
-# In[ ]:
-
-
 evaluator = Evaluate()
 train_D = data_generator(train_data)
 
@@ -427,13 +405,13 @@ train_model.fit_generator(train_D.__iter__(),
 # In[ ]:
 
 
-train_model.save("../models/ccks.20191202.model")
+train_model.load_weights("./best_model.weights")
 
 
 # In[ ]:
 
 
-extract_entity("截至 {DATE_0}，公司已通过股票回购专用证券账户以集中竞价交易方式回购股份数量 {NUM_0} 股，占公司总股本的 {NUM_1}，最高成交价为 {NUM_2} 元/股，最低成交价为 {NUM_3} 元/股", 
+extract_entity("截至 {DATE_0}，", 
                "回购__总金额")
 
 

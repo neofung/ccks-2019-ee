@@ -156,19 +156,37 @@ original_train_df = pd.read_csv("../data/event_type_entity_extract_train.csv", n
 # In[ ]:
 
 
+original_train_df.shape
+
+
+# In[ ]:
+
+
+original_train_df['query'] = original_train_df['query'].apply(lambda x: x+'__主体' if x !='其他' else x)
+
+
+# In[ ]:
+
+
+original_train_df['query'].value_counts()
+
+
+# In[ ]:
+
+
 updated_train_df = pd.concat([new_label_df, original_train_df], axis=0)
 
 
 # In[ ]:
 
 
-updated_train_df.to_csv("../data/cat_train.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
+updated_train_df.to_csv("../temp/cat_train.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
 
 
 # In[ ]:
 
 
-new_label_eval.to_csv("../data/cat_eval.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
+new_label_eval.to_csv("../temp/cat_eval.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
 
 
 # In[ ]:
