@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# >> 参考 https://github.com/bojone/bert_in_keras/blob/master/subject_extract.py
+# > 参考 https://github.com/bojone/bert_in_keras/blob/master/subject_extract.py
 
 # In[ ]:
 
@@ -95,6 +95,12 @@ classes = set(D[2].unique())
 # In[ ]:
 
 
+print(classes)
+
+
+# In[ ]:
+
+
 train_data = []
 for t,c,n in zip(D[1], D[2], D[3]):
     train_data.append((t, c, n))
@@ -128,6 +134,12 @@ for d in train_data + dev_data:
     additional_chars.update(re.findall(u'[^\u4e00-\u9fa5a-zA-Z0-9\*]', d[2]))
 
 additional_chars.remove('，')
+
+
+# In[ ]:
+
+
+additional_chars
 
 
 # In[ ]:
@@ -244,7 +256,9 @@ set_session(sess)  # set this TensorFlow session as the default session for Kera
 # In[ ]:
 
 
-bert_model = load_trained_model_from_checkpoint(config_path, checkpoint_path, seq_len=None)
+bert_model = load_trained_model_from_checkpoint(config_path, 
+                                                checkpoint_path, 
+                                                seq_len=None)
 
 for l in bert_model.layers:
     l.trainable = True
@@ -394,14 +408,14 @@ train_model.fit_generator(train_D.__iter__(),
 # In[ ]:
 
 
-# train_model.load_weights('best_model.weights')
+train_model.load_weights('../models/bert_best_model.weights')
 
 
 # In[ ]:
 
 
-extract_entity("陈帅先生、张列列先生",
-               "交易违规")
+extract_entity("因个人原因，杨永平先生申请辞去所担任的董事、总经理、战略与投资管理委员会委员等职务。",
+               "担任__时间")
 
 
 # In[ ]:
