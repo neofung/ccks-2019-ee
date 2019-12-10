@@ -36,12 +36,12 @@ print(len(D))
 # In[ ]:
 
 
-if not os.path.exists('../temp/classes.json'):
+if not os.path.exists('../temp/ee_classes.json'):
     id2class = dict(enumerate(D[2].unique()))
     class2id = {j:i for i,j in id2class.items()}
-    json.dump([id2class, class2id], open('../temp/classes.json', 'w'))
+    json.dump([id2class, class2id], open('../temp/ee_classes.json', 'w'))
 else:
-    id2class, class2id = json.load(open('../temp/classes.json'))
+    id2class, class2id = json.load(open('../temp/ee_classes.json'))
 
 
 # In[ ]:
@@ -60,7 +60,7 @@ for t,c,n in zip(D[1], D[2], D[3]):
 
 
 import re
-if not os.path.exists('../temp/all_chars_me.json'):
+if not os.path.exists('../temp/ee_all_chars_me.json'):
     chars = {}
     for d in tqdm(iter(train_data)):
         items = re.split("[\{\}]", d[0])
@@ -74,9 +74,9 @@ if not os.path.exists('../temp/all_chars_me.json'):
     chars = {i:j for i,j in chars.items() if j >= min_count}
     id2char = {i+2:j for i,j in enumerate(chars)} # 0: mask, 1: padding
     char2id = {j:i for i,j in id2char.items()}
-    json.dump([id2char, char2id], open('../temp/all_chars_me.json', 'w'))
+    json.dump([id2char, char2id], open('../temp/ee_all_chars_me.json', 'w'))
 else:
-    id2char, char2id = json.load(open('../temp/all_chars_me.json'))
+    id2char, char2id = json.load(open('../temp/ee_all_chars_me.json'))
 
 
 # In[ ]:

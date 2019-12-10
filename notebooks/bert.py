@@ -256,9 +256,20 @@ set_session(sess)  # set this TensorFlow session as the default session for Kera
 # In[ ]:
 
 
-bert_model = load_trained_model_from_checkpoint(config_path, 
-                                                checkpoint_path, 
-                                                seq_len=None)
+bert_model = load_trained_model_from_checkpoint(
+    config_file=config_path,
+    checkpoint_file=checkpoint_path,
+    training=False,
+    trainable=True,
+    use_task_embed=True,
+    task_num=10,
+    seq_len=None
+)
+
+
+# bert_model = load_trained_model_from_checkpoint(config_path, 
+#                                                 checkpoint_path, 
+#                                                 seq_len=None)
 
 for l in bert_model.layers:
     l.trainable = True

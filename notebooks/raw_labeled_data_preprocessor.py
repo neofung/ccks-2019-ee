@@ -75,6 +75,21 @@ list(intent_entity_dict.keys()).remove('选举')
 # In[ ]:
 
 
+for t  in ['资金账户风险', '涉嫌欺诈', '业绩下滑', '信批违规', '涉嫌传销', '交易违规', '财务造假', '评级调整',
+       '重组失败', '涉嫌违法', '实控人股东变更', '不能履职', '涉嫌非法集资', '资产负面', '歇业停业',
+       '提现困难', '高管负面', '投诉维权', '失联跑路', '产品违规', '公司股市异常']:
+    intent_entity_dict[t]={'主体'}
+
+
+# In[ ]:
+
+
+intent_entity_dict
+
+
+# In[ ]:
+
+
 import random
 new_label_df = []
 for t in new_labeled_data:
@@ -97,16 +112,17 @@ for t in new_labeled_data:
                 'query': intent+'__'+ t,
                 'answer': 'no_given'
             })
-    else:
-        temp = list(intent_entity_dict.keys())
-        temp.remove(intent)
-        mock_intent = random.choice(temp)
+    temp = list(intent_entity_dict.keys())
+    temp.remove(intent)
+    mock_intents = random.sample(temp, 6)
+    for mock_intent in mock_intents:
         mock_entity = random.choice(list(intent_entity_dict[mock_intent]))
-        new_label_df.append({
-            'sentence': sentence,
-            'query': mock_intent+'__'+ mock_entity,
-            'answer': 'no_given'
-        })
+        for mock_entity in intent_entity_dict[mock_intent]:
+            new_label_df.append({
+                'sentence': sentence,
+                'query': mock_intent+'__'+ mock_entity,
+                'answer': 'no_given'
+            })
 
 
 # In[ ]:
@@ -118,7 +134,7 @@ new_label_df = pd.DataFrame(new_label_df)
 # In[ ]:
 
 
-# new_label_df.head(20)
+new_label_df.shape
 
 
 # In[ ]:
@@ -168,7 +184,7 @@ original_train_df['query'] = original_train_df['query'].apply(lambda x: x+'__主
 # In[ ]:
 
 
-original_train_df['query'].value_counts()
+original_train_df['query'].unique()
 
 
 # In[ ]:
