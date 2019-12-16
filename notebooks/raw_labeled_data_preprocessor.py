@@ -66,11 +66,64 @@ for item in new_labeled_data:
         intent_entity_dict[item['intent']].add(entity['entity'])
 
 
+# # 输出用于分类的数据
+
 # In[ ]:
 
 
-list(intent_entity_dict.keys()).remove('选举')
+new_label_df = []
+for t in new_labeled_data:
+    new_label_df.append({
+        'sentence': t['text'],
+        'event': t['intent']
+    })
+    
+new_label_df = pd.DataFrame(new_label_df)
 
+
+# In[ ]:
+
+
+new_label_df.head()
+
+
+# In[ ]:
+
+
+new_label_train, new_label_eval = train_test_split(new_label_df, test_size=0.3, stratify=new_label_df.event)
+
+
+# In[ ]:
+
+
+original_train_df = pd.read_csv("../data/event_type_entity_extract_train.csv", names=['id', 'sentence', 'event', 'answer'])
+
+
+# In[ ]:
+
+
+original_train_df['event'].unique()
+
+
+# In[ ]:
+
+
+updated_train_df = pd.concat([new_label_df, original_train_df], axis=0)
+
+
+# In[ ]:
+
+
+updated_train_df.to_csv("../temp/cat_classification_train.csv", index=False, header=False, columns=['id', 'sentence', 'event'])
+
+
+# In[ ]:
+
+
+new_label_eval.to_csv("../temp/cat_classification_eval.csv", index=False, header=False, columns=['id', 'sentence', 'event', 'answer'])
+
+
+# # 输出用于抽取实体的数据
 
 # In[ ]:
 
@@ -85,6 +138,12 @@ for t  in ['资金账户风险', '涉嫌欺诈', '业绩下滑', '信批违规',
 
 
 intent_entity_dict
+
+
+# In[ ]:
+
+
+joblib.dump(intent_entity_dict, "../temp/intent_entity_dict.pkl")
 
 
 # In[ ]:
@@ -112,17 +171,17 @@ for t in new_labeled_data:
                 'query': intent+'__'+ t,
                 'answer': 'no_given'
             })
-    temp = list(intent_entity_dict.keys())
-    temp.remove(intent)
-    mock_intents = random.sample(temp, 6)
-    for mock_intent in mock_intents:
-        mock_entity = random.choice(list(intent_entity_dict[mock_intent]))
-        for mock_entity in intent_entity_dict[mock_intent]:
-            new_label_df.append({
-                'sentence': sentence,
-                'query': mock_intent+'__'+ mock_entity,
-                'answer': 'no_given'
-            })
+#     temp = list(intent_entity_dict.keys())
+#     temp.remove(intent)
+#     mock_intents = random.sample(temp, 6)
+#     for mock_intent in mock_intents:
+#         mock_entity = random.choice(list(intent_entity_dict[mock_intent]))
+#         for mock_entity in intent_entity_dict[mock_intent]:
+#             new_label_df.append({
+#                 'sentence': sentence,
+#                 'query': mock_intent+'__'+ mock_entity,
+#                 'answer': 'no_given'
+#             })
 
 
 # In[ ]:
@@ -155,12 +214,12 @@ new_label_df.head()
 new_label_df.shape
 
 
-# # read original data
+# ## read original data
 
 # In[ ]:
 
 
-new_label_train, new_label_eval = train_test_split(new_label_df, test_size=0.3)
+new_label_train, new_label_eval = train_test_split(new_label_df, test_size=0.3, stratify= new_label_df['query'])
 
 
 # In[ ]:
@@ -196,19 +255,25 @@ updated_train_df = pd.concat([new_label_df, original_train_df], axis=0)
 # In[ ]:
 
 
-updated_train_df.to_csv("../temp/cat_train.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
+updated_train_df.to_csv("../temp/cat_event_extraction_train.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
 
 
 # In[ ]:
 
 
-new_label_eval.to_csv("../temp/cat_eval.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
+new_label_eval.to_csv("../temp/cat_event_extraction_eval.csv", index=False, header=False, columns=['id', 'sentence', 'query', 'answer'])
 
 
 # In[ ]:
 
 
 len(updated_train_df)
+
+
+# In[ ]:
+
+
+new_label_eval.shape
 
 
 # In[ ]:

@@ -13,16 +13,15 @@ import numpy as np
 import pandas as pd
 from keras_bert import load_trained_model_from_checkpoint, Tokenizer
 import codecs
-import hanlp
 
 
 # In[ ]:
 
 
 mode = 0
-maxlen = 256
-learning_rate = 5e-5
-min_learning_rate = 1e-5
+maxlen = 320
+learning_rate = 3e-5
+min_learning_rate = 3e-6
 
 
 # In[ ]:
@@ -96,35 +95,39 @@ tokenizer = OurTokenizer(token_dict)
 # In[ ]:
 
 
-D = pd.read_csv('../temp/cat_event_extraction_train.csv', encoding='utf-8', header=None)
-D = D[D[2] != u'其他']
-classes = set(D[2].unique())
+D = pd.read_csv('../temp/cat_classification_train.csv', encoding='utf-8', header=None)
+# D = D[D[2] != u'其他']
+classes = list(set(D[2].unique()))
+classes.sort()
 
 
 # In[ ]:
 
 
-print(classes)
+classes2id = {}
+for i, c in enumerate(classes):
+    classes2id[c]=i
+classes2id
 
 
 # In[ ]:
 
 
 train_data = []
-for t,c,n in zip(D[1], D[2], D[3]):
-    train_data.append((t, c, n))
+for t,c in zip(D[1], D[2]):
+    train_data.append((t, classes2id[c]))
 
 
-if True or not os.path.exists('../temp/bert_random_order_train.json'):
+if True or not os.path.exists('../temp/bert_classification_random_order_train.json'):
     random_order = list(range(len(train_data)))
     np.random.shuffle(random_order)
     json.dump(
         random_order,
-        open('../temp/bert_random_order_train.json', 'w'),
+        open('../temp/bert_classification_random_order_train.json', 'w'),
         indent=4
     )
 else:
-    random_order = json.load(open('../temp/bert_random_order_train.json'))
+    random_order = json.load(open('../temp/bert_classification_random_order_train.json'))
 
 
 # In[ ]:
@@ -139,10 +142,6 @@ else:
 dev_data = [train_data[j] for i, j in enumerate(random_order) if i % 9 == mode]
 train_data = [train_data[j] for i, j in enumerate(random_order) if i % 9 != mode]
 additional_chars = set()
-for d in train_data + dev_data:
-    additional_chars.update(re.findall(u'[^\u4e00-\u9fa5a-zA-Z0-9\*]', d[2]))
-
-additional_chars.remove('，')
 
 
 # In[ ]:
@@ -154,10 +153,10 @@ additional_chars
 # In[ ]:
 
 
-D = pd.read_csv('../temp/cat_event_extraction_eval.csv', encoding='utf-8', header=None)
+D = pd.read_csv('../temp/cat_classification_eval.csv', encoding='utf-8', header=None)
 test_data = []
-for id,t,c in zip(D[0], D[1], D[2]):
-    test_data.append((id, t, c))
+for id,t in zip(D[0], D[1]):
+    test_data.append((id, t))
 
 
 # In[ ]:
@@ -170,6 +169,12 @@ train_data[0]
 
 
 tokenizer.tokenize('勤上光电')
+
+
+# In[ ]:
+
+
+tokenizer.encode(first='勤上光电, 测试', second='bert')
 
 
 # In[ ]:
@@ -207,36 +212,21 @@ class data_generator:
         while True:
             idxs = list(range(len(self.data)))
             np.random.shuffle(idxs)
-            X1, X2, S1, S2 = [], [], [], []
+            X1, X2, Y = [], [], []
             for i in idxs:
                 d = self.data[i]
-                text, c = d[0][:maxlen], d[1]
-                text = '___%s___%s' % (c, text)
-                tokens = tokenizer.tokenize(text)
-                e = d[2]
-                e_tokens = tokenizer.tokenize(e)[1:-1]
-                s1, s2 = np.zeros(len(tokens)), np.zeros(len(tokens))
-                start = list_find(tokens, e_tokens)
-                if start != -1:
-                    end = start + len(e_tokens) - 1
-                else:
-                    start = len(e_tokens) -1
-                    end = len(e_tokens) - 1
-                    
-                s1[start] = 1
-                s2[end] = 1
+                text = d[0][:maxlen]
                 x1, x2 = tokenizer.encode(first=text)
+                y = d[1]
                 X1.append(x1)
                 X2.append(x2)
-                S1.append(s1)
-                S2.append(s2)
+                Y.append([y])
                 if len(X1) == self.batch_size or i == idxs[-1]:
                     X1 = seq_padding(X1)
                     X2 = seq_padding(X2)
-                    S1 = seq_padding(S1)
-                    S2 = seq_padding(S2)
-                    yield [X1, X2, S1, S2], None
-                    X1, X2, S1, S2 = [], [], [], []
+                    Y = seq_padding(Y)
+                    yield [X1, X2], Y
+                    [X1, X2, Y] = [], [], []
 
 
 # In[ ]:
@@ -284,37 +274,31 @@ for l in bert_model.layers:
     l.trainable = True
 
 
-x1_in = Input(shape=(None,)) # 待识别句子输入
-x2_in = Input(shape=(None,)) # 待识别句子输入
-s1_in = Input(shape=(None,)) # 实体左边界（标签）
-s2_in = Input(shape=(None,)) # 实体右边界（标签）
+# In[ ]:
 
-x1, x2, s1, s2 = x1_in, x2_in, s1_in, s2_in
-x_mask = Lambda(lambda x: K.cast(K.greater(K.expand_dims(x, 2), 0), 'float32'))(x1)
 
-x = bert_model([x1, x2])
-ps1 = Dense(1, use_bias=False)(x)
-ps1 = Lambda(lambda x: x[0][..., 0] - (1 - x[1][..., 0]) * 1e10)([ps1, x_mask])
-ps2 = Dense(1, use_bias=False)(x)
-ps2 = Lambda(lambda x: x[0][..., 0] - (1 - x[1][..., 0]) * 1e10)([ps2, x_mask])
+from keras.utils.np_utils import to_categorical
+
+x1_in = Input(shape=(None,))
+x2_in = Input(shape=(None,))
+
+x = bert_model([x1_in, x2_in])
+x = Lambda(lambda x: x[:, 0])(x)
+p = Dense(len(classes2id), activation='softmax')(x)
+
+# categorical_labels = to_categorical(int_labels, num_classes=None)
 
 
 # In[ ]:
 
 
-model = Model([x1_in, x2_in], [ps1, ps2])
-
-
-train_model = Model([x1_in, x2_in, s1_in, s2_in], [ps1, ps2])
-
-loss1 = K.mean(K.categorical_crossentropy(s1_in, ps1, from_logits=True))
-ps2 -= (1 - K.cumsum(s1, 1)) * 1e10
-loss2 = K.mean(K.categorical_crossentropy(s2_in, ps2, from_logits=True))
-loss = loss1 + loss2
-
-train_model.add_loss(loss)
-train_model.compile(optimizer=Adam(learning_rate))
-train_model.summary()
+model = Model([x1_in, x2_in], p)
+model.compile(
+    loss='sparse_categorical_crossentropy',
+    optimizer=Adam(learning_rate), # 用足够小的学习率
+    metrics=['sparse_categorical_accuracy'],
+)
+model.summary()
 
 
 # In[ ]:
@@ -329,26 +313,15 @@ def softmax(x):
 # In[ ]:
 
 
-def extract_entity(text_in, c_in):
-    if c_in not in classes:
-        return 'NaN'
-    text_in = '___%s___%s' % (c_in, text_in)
-    text_in = text_in[:510]
+def predict_event(text_in):
+    text_in = text_in[:maxlen]
     _tokens = tokenizer.tokenize(text_in)
     _x1, _x2 = tokenizer.encode(first=text_in)
     _x1, _x2 = np.array([_x1]), np.array([_x2])
-    _ps1, _ps2  = model.predict([_x1, _x2])
-    _ps1, _ps2 = softmax(_ps1[0]), softmax(_ps2[0])
-    for i, _t in enumerate(_tokens):
-        if len(_t) == 1 and re.findall(u'[^\u4e00-\u9fa5a-zA-Z0-9\*]', _t) and _t not in additional_chars:
-            _ps1[i] -= 10
-    start = _ps1.argmax()
-    for end in range(start, len(_tokens)):
-        _t = _tokens[end]
-        if len(_t) == 1 and re.findall(u'[^\u4e00-\u9fa5a-zA-Z0-9\*]', _t) and _t not in additional_chars:
-            break
-    end = _ps2[start:end+1].argmax() + start
-    a = text_in[start-1: end]
+    _ps  = model.predict([_x1, _x2])
+    _ps = softmax(_ps[0])
+    _ps = _ps.argmax()
+    a = classes[_ps]
 #     print(text_in)
 #     print(start-1, end)
 #     print(text_in[:start-1])
@@ -380,16 +353,16 @@ class Evaluate(Callback):
         self.ACC.append(acc)
         if acc > self.best:
             self.best = acc
-            train_model.save_weights('../models/bert_best_model.weights')
+            model.save_weights('../models/bert_classification_best_model.weights')
         print('acc: %.4f, best acc: %.4f\n' % (acc, self.best))
     def evaluate(self):
         A = 1e-10
-        with open('../temp/dev_pred.json', 'w', encoding='utf-8')as F:
+        with open('../temp/bert_classification_dev_pred.json', 'w', encoding='utf-8')as F:
             for d in tqdm(iter(dev_data)):
-                R = extract_entity(d[0], d[1])
-                if R == d[2]:
+                R = predict_event(d[0])
+                if R == classes[d[1]]:
                     A += 1
-                s = ', '.join(d)
+                s = ', '.join([str(t) for t in d])
                 s += ', '
                 s += R
                 F.write(s + '\n')
@@ -402,9 +375,9 @@ class Evaluate(Callback):
 def test(test_data):
     """注意官方页面写着是以\t分割，实际上却是以逗号分割
     """
-    with open('../temp/result.txt', 'w', encoding='utf-8') as F:
+    with open('../temp/classification_result.txt', 'w', encoding='utf-8') as F:
         for d in tqdm(iter(test_data)):
-            s = '"%s","%s"\n' % (d[0], extract_entity(d[1].replace('\t', ''), d[2]))
+            s = '"%s","%s","%s"\n' % (d[0], d[1], predict_event(d[1].replace('\t', '')))
             F.write(s)
 
 
@@ -413,29 +386,38 @@ def test(test_data):
 
 evaluator = Evaluate()
 train_D = data_generator(train_data)
+dev_D = data_generator(dev_data)
 
 
 # In[ ]:
 
 
-train_model.fit_generator(train_D.__iter__(),
-                              steps_per_epoch=len(train_D),
-                              epochs=100,
-                              callbacks=[evaluator]
-                             )
+model.fit_generator(
+    train_D.__iter__(),
+    steps_per_epoch=len(train_D),
+    epochs=100,
+    validation_data=dev_D.__iter__(),
+    validation_steps=len(dev_D),
+    callbacks=[evaluator]
+)
 
 
 # In[ ]:
 
 
-train_model.load_weights('../models/bert_best_model.weights')
+# model.save_weights("../models/bert_classification_best_model.weights")
 
 
 # In[ ]:
 
 
-extract_entity("因个人原因，杨永平先生申请辞去所担任的董事、总经理、战略与投资管理委员会委员等职务。",
-               "辞职__主体")
+model.load_weights('../models/bert_classification_best_model.weights')
+
+
+# In[ ]:
+
+
+predict_event("浙江尤夫高新纤维股份有限公司（以下简称“公司”）董事会于 2017 年 1月 4 日收到公司独立董事王华平先生提交的书面辞职报告，王华平先生因个人原因辞去公司第三届董事会独立董事、公司第三届董事会战略决策委员会以及薪酬与考核委员会职务。")
 
 
 # In[ ]:
@@ -447,64 +429,10 @@ test(test_data)
 # In[ ]:
 
 
-import joblib
-intent_entity_dict = joblib.load("../temp/intent_entity_dict.pkl")
-
-
-# In[ ]:
-
-
-import re
-D = pd.read_csv('../temp/classification_result.txt', encoding='utf-8', header=None)
-results = []
-
-processed_ids = set()
-
-with open('../temp/result.txt', 'w', encoding='utf-8') as F:
-    for id,sentence,c in tqdm(zip(D[0], D[1], D[2]), total=13633):
-        t = re.sub("\d{4}\s*年\d{1,2}\s*月\d{1,2}\s*日", "{DATE}", sentence)
-        t_ids= id.split("_")
-        id = '_'.join(t_ids[:3])
-        processed_ids.add(id)
-        if len(processed_ids) >100:
-            break
-        if c=='其他':
-            results.append({
-                "id": id,
-                "sentence": t,
-            })
-        else:
-            entities = intent_entity_dict[c]
-            for entity in entities:
-                query = c+"__"+entity
-                answer = extract_entity(t.replace('\t', ''), query)
-                if answer and answer!='_':
-                    results.append({
-                        "id": id,
-                        "sentence": t,
-                        "subject": c,
-                        "predicate": entity,
-                        "object": answer
-                    })
-
-
-# In[ ]:
-
-
-results_df = pd.DataFrame(results)
-results_df
-
-
-# In[ ]:
-
-
-results_df.fillna("", inplace=True)
-
-
-# In[ ]:
-
-
-results_df.to_excel("../temp/spo_extraction_results.xlsx",index=False, encoding='utf-8', columns=['id', 'sentence', 'subject', 'predicate', 'object'])
+D = pd.read_csv('../temp/sentences_test.tsv', encoding='utf-8', header=None, sep='\t')
+test_data = []
+for id,t in zip(D[0], D[1]):
+    test_data.append((id, t))
 
 
 # In[ ]:
