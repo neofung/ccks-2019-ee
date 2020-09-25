@@ -37,7 +37,7 @@ torch==1.3.1
 gensim==3.8.1
 pyhanlp==0.1.57
 keras==2.2.4
-tensorflow-gpu==1.12.2
+tensorflow-gpu==1.15.4
 tensorboard==1.12.2
 tensorflow-estimator==1.13.0
 pytorch-transformers==1.2.0
